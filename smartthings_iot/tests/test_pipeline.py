@@ -98,3 +98,8 @@ def test_product_regex_no_false_positive():
     assert ps[0] == ["냉장고"]
     assert ps[1] == ["TV"]
     assert set(ps[2]) == {"허브_스테이션", "스마트폰_앱"}
+
+
+def test_parse_cbox_jsonp():
+    d = naver.parse_cbox('/**/cb({"success":true,"result":{"commentList":[{"commentNo":"1"}]}});')
+    assert d["result"]["commentList"][0]["commentNo"] == "1"

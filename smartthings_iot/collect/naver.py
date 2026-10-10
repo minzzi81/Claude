@@ -3,11 +3,12 @@
 - 검색: https://developers.naver.com/docs/serviceapi/search/blog/blog.md (일 25,000회, 쿼리당 최대 1,000건)
 - 검색 API는 요약(description)만 주므로, 블로그는 본문 페이지를 추가로 가져온다.
 - 카페 글은 대부분 로그인이 필요해 본문 대신 제목+요약만 저장한다.
-- 블로그 댓글(fetch_blog_comments)은 공식 API가 없어 모바일 댓글 페이지를 파싱한다(실험적).
+- 블로그 댓글(fetch_blog_comments)은 공식 API가 없어 웹 댓글 위젯(cbox)의 JSONP 응답을 쓴다(실험적).
   네이버 페이지 구조가 바뀌면 0건을 반환할 수 있으며, 이 경우 수집기는 게시물만 저장하고 계속 진행한다.
 """
 from __future__ import annotations
 
+import json
 import os
 import re
 from email.utils import parsedate_to_datetime
@@ -97,25 +98,50 @@ def item_to_post(kind: str, item: dict, query: str) -> Post:
                 extra={"snippet_only": True})
 
 
+CBOX = "https://apis.naver.com/commentBox/cbox/web_naver_list_jsonp.json"
+
+
+def fetch_blog_no(blog_id: str, log_no: str) -> str | None:
+    """댓글 objectId에 필요한 숫자형 blogNo를 모바일 글 페이지에서 추출."""
+    r = http_get("https://m.blog.naver.com/PostView.naver",
+                 params={"blogId": blog_id, "logNo": log_no})
+    m = re.search(r"blogNo\s*=\s*'?(\d+)", r.text) if r.status_code == 200 else None
+    return m.group(1) if m else None
+
+
+def parse_cbox(text: str) -> dict:
+    """JSONP(`cb({...})`) 응답에서 JSON 본문만 파싱."""
+    return json.loads(text[text.index("(") + 1:text.rindex(")")])
+
+
 def fetch_blog_comments(blog_id: str, log_no: str, post_id: str, limit: int = 200) -> list[Comment]:
-    """[실험적] 모바일 댓글 페이지(u_cbox 마크업)에서 댓글 파싱."""
-    r = http_get("https://m.blog.naver.com/CommentList.naver",
-                 params={"blogId": blog_id, "logNo": log_no},
-                 headers={"Referer": f"https://m.blog.naver.com/{blog_id}/{log_no}"})
-    if r.status_code != 200:
+    """[실험적] 네이버 댓글(cbox) JSONP API에서 댓글+답글 수집. 공식 API가 아니라 구조 변경 시 0건."""
+    blog_no = fetch_blog_no(blog_id, log_no)
+    if not blog_no:
         return []
-    soup = BeautifulSoup(r.text, "html.parser")
     out: list[Comment] = []
-    for i, li in enumerate(soup.select("li.u_cbox_comment")[:limit]):
-        txt = li.select_one(".u_cbox_contents")
-        if not txt:
-            continue
-        nick = li.select_one(".u_cbox_nick")
-        date = li.select_one(".u_cbox_date")
-        cid = li.get("data-info") or f"{i}"
-        out.append(Comment(
-            comment_id=f"naver_blog:{blog_id}_{log_no}:{cid}", post_id=post_id,
-            source="naver_blog", text=clean_text(txt.get_text(" ")),
-            created_at=clean_text(date.get_text()) if date else "",
-            author_hash=hash_author(nick.get_text() if nick else None)))
-    return out
+    page = 1
+    while len(out) < limit:
+        r = http_get(CBOX, headers={"Referer": f"https://m.blog.naver.com/{blog_id}/{log_no}"},
+                     params={"ticket": "blog", "templateId": "default", "pool": "blogid",
+                             "lang": "ko", "country": "KR", "pageSize": 50, "page": page,
+                             "objectId": f"{blog_no}_201_{log_no}", "_callback": "cb"})
+        if r.status_code != 200:
+            break
+        res = parse_cbox(r.text).get("result") or {}
+        for c in res.get("commentList") or []:
+            if c.get("deleted") or not c.get("contents"):
+                continue
+            parent = c.get("parentCommentNo")
+            out.append(Comment(
+                comment_id=f"naver_blog:{blog_id}_{log_no}:{c['commentNo']}", post_id=post_id,
+                source="naver_blog", text=clean_text(c["contents"]),
+                created_at=(c.get("regTime") or "")[:10],
+                author_hash=hash_author(c.get("userName")),
+                like_count=c.get("sympathyCount"),
+                parent_comment_id=(f"naver_blog:{blog_id}_{log_no}:{parent}"
+                                   if parent and parent != c["commentNo"] else "")))
+        if page >= ((res.get("pageModel") or {}).get("totalPages") or 1):
+            break
+        page += 1
+    return out[:limit]
