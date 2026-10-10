@@ -12,7 +12,7 @@ cp .env.example .env   # 키 입력
 | 소스 | 필요한 키 | 수집 대상 | 비고 |
 |---|---|---|---|
 | 네이버 블로그/카페/뉴스 | `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET` ([developers.naver.com](https://developers.naver.com) → 검색 API) | 게시물 (블로그는 본문 전문) | 일 25,000회, 쿼리당 최대 1,000건. 카페는 로그인 필요로 요약문만 |
-| 네이버 블로그 댓글 | — | 댓글 | **실험적**: 공식 API 없음, 모바일 댓글 페이지 파싱. 구조 변경 시 0건 |
+| 네이버 블로그 댓글 | — | 댓글 | **실험적**: 공식 API 없음, 댓글 위젯(cbox) JSONP 응답 사용. 구조 변경 시 0건 |
 | YouTube | `YOUTUBE_API_KEY` (Google Cloud → YouTube Data API v3) | 영상(게시물) + **댓글 주 소스** | 일 10,000 units. 이 설정 기준 약 1,500~2,000 units 소모 |
 | Instagram | `IG_USER_ID`, `IG_ACCESS_TOKEN` (비즈니스 계정 + Graph API) | 해시태그 게시물 캡션 | 타인 게시물 댓글 본문은 Graph API로 조회 불가. 비공식 스크래핑은 약관 위반이라 미지원 |
 
