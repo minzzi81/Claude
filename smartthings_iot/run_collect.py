@@ -129,7 +129,7 @@ def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
     load_dotenv()
     ap = argparse.ArgumentParser()
-    ap.add_argument("--sources", nargs="+", default=["naver", "youtube", "instagram"])
+    ap.add_argument("--sources", nargs="+", default=["naver", "youtube"])
     ap.add_argument("--export", action="store_true", help="수집 없이 CSV 내보내기만")
     ap.add_argument("--cap", nargs="+", default=[], metavar="SOURCE=N",
                     help="source_post_caps 덮어쓰기 (예: naver_blog=600)")

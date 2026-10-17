@@ -9,7 +9,7 @@ source_post_caps:
   naver_cafe: 100
   naver_news: 50
   youtube: 100
-  instagram: 100
+  instagram: 0      # 분석 범위에서 제외 (타인 게시물 댓글 수집 불가). --sources instagram 으로만 실행
 
 # 관련성 필터: 본문/제목에 이 중 하나는 들어가야 함
 relevance_terms: ["스마트싱스", "smartthings", "smart things", "스마트 싱스"]

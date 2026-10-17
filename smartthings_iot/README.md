@@ -15,7 +15,7 @@ cp .env.example .env   # 키 입력
 | 네이버 블로그 (키 없음) | — | 게시물 (본문 전문) | 키가 없으면 블로그 섹션 검색(`section.blog.naver.com`)으로 자동 대체. 블로그만, 쿼리당 최대 1,000건 |
 | 네이버 블로그 댓글 | — | 댓글 (답글 포함) | **실험적**: 공식 API 없음, 댓글 위젯용 commentBox JSON 호출. 구조 변경 시 0건. 글당 평균 2~3건 |
 | YouTube | `YOUTUBE_API_KEY` (Google Cloud → YouTube Data API v3) | 영상(게시물) + **댓글 주 소스** | 일 10,000 units. 이 설정 기준 약 1,500~2,000 units 소모 |
-| Instagram | `IG_USER_ID`, `IG_ACCESS_TOKEN` (비즈니스 계정 + Graph API) | 해시태그 게시물 캡션 | 타인 게시물 댓글 본문은 Graph API로 조회 불가. 비공식 스크래핑은 약관 위반이라 미지원 |
+| Instagram | `IG_USER_ID`, `IG_ACCESS_TOKEN` (비즈니스 계정 + Graph API) | 해시태그 게시물 캡션 | **기본 수집에서 제외.** 타인 게시물 댓글 본문은 Graph API로 조회 불가, 비공식 스크래핑은 약관 위반이라 미지원 |
 
 댓글 5,000건은 주로 YouTube에서 채워진다. 키가 없는 소스는 자동으로 건너뛴다.
 YouTube는 키 없이 접근하면 클라우드/데이터센터 IP에서 봇 확인 페이지가 떠서 영상·댓글을 가져올 수 없다. 그래서 키 없는 대체 경로는 만들지 않았다.
