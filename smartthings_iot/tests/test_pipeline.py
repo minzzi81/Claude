@@ -36,6 +36,35 @@ def test_item_to_post_blog():
     assert p.author_hash and p.author_hash != "nick"
 
 
+def test_web_item_to_api():
+    it = {"domainIdOrBlogId": "abc", "logNo": 1, "postUrl": "https://blog.naver.com/abc/1",
+          "title": "<strong>스마트싱스</strong> 루틴", "contents": "조명 자동화",
+          "addDate": 1767193200000}   # 2025-12-31T15:00Z = 2026-01-01 00:00 KST
+    p = naver.item_to_post("blog", naver.web_item_to_api(it), "스마트싱스")
+    assert p.post_id == "naver_blog:abc_1" and p.created_at == "2026-01-01"
+    assert p.title == "스마트싱스 루틴"
+
+
+def test_parse_blog_page():
+    html_ = "<script>var blogNo = '123';</script><div class='se-main-container'><p>본문</p></div>"
+    assert naver.parse_blog_page(html_) == ("본문", "123")
+
+
+def test_parse_cbox_comments():
+    items = [
+        {"commentNo": "1", "parentCommentNo": "1", "contents": "에어컨 연동<br>편해요",
+         "regTime": "2026-08-26T16:24:13+0900", "profileUserId": "u1", "sympathyCount": 2},
+        {"commentNo": "2", "parentCommentNo": "1", "contents": "감사합니다", "userName": "owner"},
+        {"commentNo": "3", "parentCommentNo": "3", "contents": "", "deleted": True},
+        {"commentNo": "4", "parentCommentNo": "4", "contents": "비밀", "secret": True},
+    ]
+    cs = naver.parse_cbox_comments(items, "abc", "9", "naver_blog:abc_9")
+    assert [c.comment_id for c in cs] == ["naver_blog:abc_9:1", "naver_blog:abc_9:2"]
+    assert cs[0].text == "에어컨 연동 편해요" and cs[0].created_at == "2026-08-26"
+    assert cs[0].parent_comment_id == "" and cs[1].parent_comment_id == "naver_blog:abc_9:1"
+    assert cs[0].author_hash and cs[0].author_hash != "u1"
+
+
 def test_jsonl_store_dedup(tmp_path):
     s = JsonlStore(tmp_path / "c.jsonl", "comment_id")
     c = Comment(comment_id="a", post_id="p", source="youtube", text="hi")

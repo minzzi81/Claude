@@ -3,6 +3,7 @@
     python run_collect.py                 # 키가 설정된 모든 소스
     python run_collect.py --sources naver youtube
     python run_collect.py --export        # data/raw/*.jsonl -> data/processed/*.csv
+    python run_collect.py --cap naver_blog=600   # 키 없는 소스 몫을 블로그로 채울 때 등 상한 덮어쓰기
 
 재실행하면 이미 저장된 id는 건너뛰고 목표치까지 이어서 수집한다.
 """
@@ -51,30 +52,36 @@ class Collector:
 
     # ---------------- 소스별 ----------------
     def run_naver(self):
-        for kind in ("blog", "cafearticle", "news"):
+        if naver.has_api_key():
+            kinds = [(k, lambda q, k=k: naver.search(k, q)) for k in ("blog", "cafearticle", "news")]
+        else:
+            log.warning("[naver] API 키 없음 -> 블로그 섹션 검색으로 블로그만 수집 (카페/뉴스 건너뜀)")
+            kinds = [("blog", naver.search_web)]
+        for kind, search in kinds:
             src = naver.KIND_TO_SOURCE[kind]
             for q in CFG["queries"]:
                 if not self.room(src):
                     break
-                for item in naver.search(kind, q):
+                for item in search(q):
                     if not self.room(src):
                         break
                     p = naver.item_to_post(kind, item, q)
                     if p.post_id in self.posts:
                         continue
                     ids = naver.parse_blog_url(p.url) if kind == "blog" else None
+                    blog_no = ""
                     if ids:
                         try:
-                            body = naver.fetch_blog_body(*ids)
+                            body, blog_no = naver.fetch_blog_page(*ids)
                             if body:
                                 p.text, p.extra["snippet_only"] = body, False
                         except Exception as e:
                             log.warning("본문 실패 %s: %s", p.url, e)
                     if not self.add_post(p):
                         continue
-                    if ids and not self.comments_done():
+                    if blog_no and not self.comments_done():
                         try:
-                            self.add_comments(naver.fetch_blog_comments(*ids, p.post_id))
+                            self.add_comments(naver.fetch_blog_comments(*ids, blog_no, p.post_id))
                         except Exception as e:
                             log.warning("댓글 실패 %s: %s", p.url, e)
                 log.info("[%s] %s -> posts=%d comments=%d", src, q, len(self.posts), len(self.comments))
@@ -124,9 +131,14 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--sources", nargs="+", default=["naver", "youtube", "instagram"])
     ap.add_argument("--export", action="store_true", help="수집 없이 CSV 내보내기만")
+    ap.add_argument("--cap", nargs="+", default=[], metavar="SOURCE=N",
+                    help="source_post_caps 덮어쓰기 (예: naver_blog=600)")
     a = ap.parse_args()
     if not a.export:
         c = Collector()
+        for kv in a.cap:
+            src, n = kv.split("=")
+            c.caps[src] = int(n)
         for s in a.sources:
             try:
                 getattr(c, f"run_{s}")()
