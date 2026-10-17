@@ -53,18 +53,26 @@ def hash_author(name: str | None) -> str:
 
 _TAG = re.compile(r"<[^>]+>")
 _WS = re.compile(r"\s+")
+_ZW = re.compile("[\u200b\u200c\u200d\ufeff]")   # 블로그 에디터가 넣는 zero-width 문자
 
 
 def clean_text(s: str | None) -> str:
     if not s:
         return ""
-    s = html.unescape(_TAG.sub(" ", s))
+    s = _ZW.sub("", html.unescape(_TAG.sub(" ", s)))
     return _WS.sub(" ", s).strip()
 
 
 def is_relevant(text: str, terms: Iterable[str]) -> bool:
     t = text.lower()
     return any(term.lower() in t for term in terms)
+
+
+def read_jsonl(path: Path) -> Iterable[dict]:
+    if path.exists():
+        for line in path.open(encoding="utf-8"):
+            if line.strip():
+                yield json.loads(line)
 
 
 class JsonlStore:
@@ -76,13 +84,10 @@ class JsonlStore:
         path.parent.mkdir(parents=True, exist_ok=True)
         self.ids: set[str] = set()
         self.count_by_source: dict[str, int] = {}
-        if path.exists():
-            for line in path.open(encoding="utf-8"):
-                if line.strip():
-                    rec = json.loads(line)
-                    self.ids.add(rec[id_key])
-                    src = rec.get("source", "")
-                    self.count_by_source[src] = self.count_by_source.get(src, 0) + 1
+        for rec in read_jsonl(path):
+            self.ids.add(rec[id_key])
+            src = rec.get("source", "")
+            self.count_by_source[src] = self.count_by_source.get(src, 0) + 1
 
     def __len__(self) -> int:
         return len(self.ids)

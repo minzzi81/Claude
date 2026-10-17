@@ -7,3 +7,6 @@ kiwipiepy>=0.17
 scikit-learn>=1.3
 scipy>=1.11
 pytest>=7.0
+# Step 2 (BERTopic). 처음 실행 시 한국어 임베딩 모델(snunlp/KR-SBERT-V40K-klueNLI-augSTS)을 내려받는다
+bertopic>=0.16
+sentence-transformers>=2.7

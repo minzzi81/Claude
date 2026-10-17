@@ -54,6 +54,41 @@ python run_analysis.py --no-inherit
    - 제품 자신을 정의하는 단어(예: 냉장고 → 냉장고·패밀리허브)는 결과에서 제외
 4. **출력** `data/results/`: `product_keywords.csv`, `product_doc_counts.csv`, `cooccurrence_edges.csv`(NPMI, 네트워크 시각화용), `tokens.jsonl`(LDA/STM 등 추가 모델링용)
 
+## 4. 큐커 vs 비교군 분석 (층화 수집 → Step 1 log-odds → Step 2 BERTopic)
+
+```bash
+python run_collect.py --design strata --sources naver youtube   # -> data/strata/{raw,processed}
+python run_focus_analysis.py --nr-topics 15                     # -> data/strata/results/
+python run_focus_analysis.py --exclude-sponsored --out-dir data/strata/results_nosponsor   # 협찬 글 제외 재확인
+```
+
+**수집 설계** (`config/settings.yaml`의 `strata`)
+- 큐커(분석 대상) 200건 + 비교군 8개 제품 × 50건 = 네이버 블로그 게시물 600건. 댓글은 블로그 + 유튜브.
+- 모든 층에 같은 포함 기준을 적용: 스마트싱스 언급 + 해당 제품 언급.
+- 검색어는 "스마트싱스 + 제품명"까지만 넣는다. 다이어트·레시피 같은 맥락어는 넣지 않는다(결론을 수집 단계에서 만들지 않기 위해).
+- 본문의 협찬 고지 문구("소정의 원고료", "제공받아" 등)를 `sponsored`로 표시.
+
+**Step 1. Log-odds ratio** (Monroe et al., 2008, informative Dirichlet prior)
+- 비교군 글 대비 큐커 글(게시물 + 댓글)에서 유난히 많이 쓰인 단어. z > 1.96 = 큐커 쪽, z < -1.96 = 비교군 쪽.
+- 스마트싱스·앱·연결처럼 제품과 무관한 단어는 |z| < 1.96으로 걸러진다(`step1_common_words.csv`). 제품명 자체는 제외.
+- 사전분포(전체 빈도)로 몇 번 안 나온 단어가 우연히 튀지 않게 보정.
+
+**Step 2. BERTopic**
+- 게시물 본문을 문단 단위로 나눠(짧은 줄은 80자 이상이 되도록 이어 붙임) 한국어 문장 임베딩(KR-SBERT) → UMAP → HDBSCAN.
+- 주제별 대표 단어는 Kiwi 토큰 기반 c-TF-IDF. 어느 주제에도 안 묶인 문단은 가장 가까운 주제로 재배정. seed 고정.
+- `step2_topic_share.csv`: 주제별 큐커/비교군 문단 비율(%)과 차이, 주제 단위 log-odds z.
+- 주제 이름은 대표 단어·대표 문단(`step2_topic_info.csv`)을 보고 `config/topic_labels.yaml`에 붙인다(`{번호: 이름}`).
+- `--nr-topics`는 판단이 필요한 값이다. 너무 크면 같은 맥락이 여러 주제로 쪼개지고, 너무 작으면 다른 맥락이 하나로 합쳐진다.
+
+**파이프라인 데모 (가상 데이터)**
+
+```bash
+python demo/make_synthetic.py
+python run_focus_analysis.py --in-dir data/demo/processed --out-dir data/demo/results --min-topic-size 10 --nr-topics 10
+```
+
+⚠️ 가설을 일부러 심어 둔 합성 데이터다. 출력 형태를 미리 보는 용도이며, 결과로 인용하면 안 된다(요약에 경고가 찍힌다).
+
 ## 테스트
 
 ```bash

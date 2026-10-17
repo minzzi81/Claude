@@ -7,8 +7,9 @@ import pandas as pd
 from kiwipiepy import Kiwi
 
 KEEP_TAGS = {"NNG", "NNP", "SL", "XR", "VA"}   # 일반/고유명사, 외국어, 어근, 형용사
+# 스마트싱스·연결·기능 같은 공통어는 일부러 남겨 둔다: 제품과 무관한 단어는 log-odds에서 z≈0으로 걸러진다
 STOPWORDS = {
-    "스마트싱스", "smartthings", "삼성", "samsung", "사용", "제품", "연결", "기능", "이번", "정도",
+    "삼성", "samsung", "사용", "제품", "이번", "정도",
     "오늘", "때문", "생각", "하나", "부분", "경우", "사람", "포스팅", "블로그", "영상", "구독",
     "좋아요", "댓글", "링크", "http", "https", "www", "com", "the", "and", "to", "of",
 }
@@ -42,13 +43,13 @@ def tag_products(docs: pd.DataFrame, products: dict[str, list[str]],
 
 
 class Tokenizer:
-    def __init__(self, products: dict[str, list[str]] | None = None, extra_stop=()):
+    def __init__(self, products: dict[str, list[str]] | None = None, extra_stop=(), user_words=()):
         self.kiwi = Kiwi()
         for pats in (products or {}).values():
             for w in pats:
                 if " " not in w and re.fullmatch(r"[가-힣]+", w):
                     self.kiwi.add_user_word(w, "NNP")
-        for w in ("스마트싱스", "스마트홈", "자동화", "루틴", "매터", "지그비"):
+        for w in ("스마트싱스", "스마트홈", "자동화", "루틴", "매터", "지그비", *user_words):
             self.kiwi.add_user_word(w, "NNP")
         self.stop = STOPWORDS | set(extra_stop)
 

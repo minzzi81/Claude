@@ -111,7 +111,12 @@ def parse_blog_page(page: str) -> tuple[str, str]:
             or soup.select_one("div#viewTypeSelector")     # 구 에디터
             or soup.select_one("div#postViewArea"))
     m = re.search(r"var blogNo = '(\d+)'", page)
-    return (clean_text(node.get_text(" ")) if node else ""), (m.group(1) if m else "")
+    if not node:
+        return "", (m.group(1) if m else "")
+    # 문단 경계는 "\n"으로 보존한다 (BERTopic을 문단 단위로 돌리기 위해)
+    paras = [clean_text(x.get_text(" ")) for x in node.select("p.se-text-paragraph")]
+    body = "\n".join(x for x in paras if x) or clean_text(node.get_text(" "))
+    return body, (m.group(1) if m else "")
 
 
 def _fmt_date(s: str) -> str:

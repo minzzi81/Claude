@@ -127,3 +127,34 @@ def test_product_regex_no_false_positive():
     assert ps[0] == ["냉장고"]
     assert ps[1] == ["TV"]
     assert set(ps[2]) == {"허브_스테이션", "스마트폰_앱"}
+
+
+def test_focus_log_odds_filters_common_and_self_terms():
+    from analysis.focus import focus_log_odds, self_terms, split_lo
+    rng = random.Random(0)
+    toks = ([["큐커", "식단", "앱", "연결"] for _ in range(40)] +
+            [["냉장고", "절약", "앱", "연결"] for _ in range(40)])
+    rng.shuffle(toks)
+    is_focus = np.array(["큐커" in t for t in toks])
+    lo = focus_log_odds(toks, is_focus, exclude=self_terms({"큐커": ["큐커"], "냉장고": ["냉장고"]}))
+    f, o, common = split_lo(lo)
+    assert f["keyword"].tolist() == ["식단"] and o["keyword"].tolist() == ["절약"]
+    assert set(common["keyword"]) == {"앱", "연결"}           # 공통어는 |z|<1.96 으로 걸러짐
+    assert "큐커" not in set(lo["keyword"])                  # 제품명 자체는 제외
+
+
+def test_paragraphs_merge_short_lines():
+    from analysis.focus import paragraphs
+    docs = pd.DataFrame([{"doc_id": "p1", "kind": "post", "stratum": "큐커", "group": "focus",
+                          "text": "짧은 줄\n" + "가" * 90 + "\n끝"}])
+    paras = paragraphs(docs, min_chars=80)
+    assert len(paras) == 1 and paras["text"][0].startswith("짧은 줄") and paras["text"][0].endswith("끝")
+
+
+def test_topic_share_percentages():
+    from analysis.focus import topic_share
+    topics = np.array([0, 0, 0, 1, 1, 1, 1, 0])
+    group = np.array(["focus", "focus", "focus", "other", "other", "other", "focus", "other"])
+    sh = topic_share(topics, group, {0: "다이어트", 1: "절약"}).set_index("topic")
+    assert sh.loc[0, "pct_focus"] == 75.0 and sh.loc[0, "pct_other"] == 25.0
+    assert sh.index[0] == 0 and sh.loc[0, "z_score"] > 0 > sh.loc[1, "z_score"]
